@@ -19,6 +19,8 @@ public class ReaderConfig
     public int WordCharLimit = 30;
     public string MiddleCharHighlightingColor = "#FFFFFF";
     public bool RightToLeft = false;
+    public bool AutoPauseOnPunctuation = true;
+    public double PunctuationPauseMultiplier = 0.5;
 
     public static ReaderConfig GetDefault()
     {

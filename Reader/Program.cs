@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls("http://localhost:5001");
 builder.Configuration.AddJsonFile("Config/appsettings.json");
 builder.Configuration.AddJsonFile("Config/appsettings.Development.json");
 
@@ -119,12 +120,9 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Base/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
-
-
-app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthorization();
 
@@ -139,5 +137,13 @@ app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/Base/_Host");
 
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+    {
+        FileName = "http://localhost:5001",
+        UseShellExecute = true
+    });
+});
 
 app.Run();

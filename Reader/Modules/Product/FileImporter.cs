@@ -23,7 +23,7 @@ public class FileImporter
     public static async Task<Tuple<ReaderState,string>> ExtractFromBrowserFiles(IReadOnlyList<IBrowserFile> files)
     {
         StringBuilder sb = new();
-
+        int pageCount = 0;
         bool[] fileSupported = new bool[files.Count];
 
         foreach ((var file, int i) in files.Select((file, i) => (file, i)))
@@ -49,7 +49,9 @@ public class FileImporter
                 }
                 else if (file.ContentType == "application/pdf")
                 {
-                    sb.Append(ExtractStringFromPDF(fileBytes));
+                    var result = ExtractStringFromPDF(fileBytes);
+                    sb.Append(result.Item1);
+                    pageCount = result.Item2;
                 }
                 else if (file.ContentType == "text/html")
                 {
@@ -82,23 +84,28 @@ public class FileImporter
            file => file.Name)
         );
 
-        return new Tuple<ReaderState,string>(new ReaderState(title, sb.ToString(), ReaderStateSource.FileUpload, sourceDescription), sb.ToString());
+        return new Tuple<ReaderState,string>(new ReaderState(title, sb.ToString(), ReaderStateSource.FileUpload, sourceDescription, pageCount: pageCount), sb.ToString());
     }
 
-    public static string ExtractStringFromPDF(byte[] byteArr)
+    public static Tuple<string, int> ExtractStringFromPDF(byte[] byteArr)
     {
         StringBuilder sb = new();
+        int pageCount = 0;
 
         using (var document = PdfDocument.Open(byteArr))
         {
             foreach (var page in document.GetPages())
             {
+                if (pageCount > 0)
+                {
+                    sb.Append("\f");
+                }
                 var text = ContentOrderTextExtractor.GetText(page, true);
-
                 sb.Append(text);
+                pageCount++;
             }
         }
-        return sb.ToString();
+        return new Tuple<string, int>(sb.ToString(), pageCount);
     }
 
     public static string ExtractStringFromHTMLStr(string htmlstr)

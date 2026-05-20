@@ -78,3 +78,18 @@ a:hover {
 .blurry {
     backdrop-filter: blur(10px);
 }
+
+.page-input-no-spinners input[type=number]::-webkit-inner-spin-button,
+.page-input-no-spinners input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.page-input-no-spinners input[type=number] {
+    -moz-appearance: textfield;
+}
+
+.page-input-field .mud-input,
+.page-input-field .mud-input-control {
+    width: auto !important;
+    min-width: 3rem !important;
+}

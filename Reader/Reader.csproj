@@ -37,10 +37,6 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
 
-    <Content Include="static\*">
-        <CopyToPublishDirectory>always</CopyToPublishDirectory>
-    </Content>
-
     <PackageReference Include="Toolbelt.Blazor.HotKeys2" Version="4.1.0.1" />
   </ItemGroup>
 
@@ -56,21 +52,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="static\js\announcementManagement.js" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="static\js\announcementManagement.js" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Folder Include="Logs\" />
-    <!-- <Content Include="static\**"> 
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory> 
-    </Content> 
-    <Content Include="Config\**"> 
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory> 
-    </Content>  -->
+    <None Update="static\**"> 
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory> 
+    </None> 
+    <None Update="Config\**"> 
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory> 
+    </None>
   </ItemGroup>
 
 </Project>

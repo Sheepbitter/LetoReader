@@ -132,6 +132,26 @@ public class ReaderConfigManager
         }
     }
 
+    public bool FrontAutoPauseOnPunctuation
+    {
+        get => Config.AutoPauseOnPunctuation;
+        set
+        {
+            Config.AutoPauseOnPunctuation = value;
+            SaveConfig();
+        }
+    }
+
+    public double FrontPunctuationPauseMultiplier
+    {
+        get => Config.PunctuationPauseMultiplier;
+        set
+        {
+            Config.PunctuationPauseMultiplier = value;
+            SaveConfig();
+        }
+    }
+
     public void SaveConfig()
     {
         _ = Task.Run(() => localStorage.SetItemAsStringAsync("readerConfig", JsonConvert.SerializeObject(Config)));

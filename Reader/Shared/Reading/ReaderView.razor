@@ -113,7 +113,7 @@
 </div>
 
 <div class="mb-10">
-    <MudSlider @bind-Value="@ReaderContext.StateManager.CurrentState.PositionInfo.Position" Min="0" Max="@(ReaderContext.Manager.TextPieces.Count-1)" Step="1" Class="text-neutral-500 text-sm" Color="Color.Tertiary">
+    <MudSlider T="int" Value="@ReaderContext.StateManager.CurrentState.PositionInfo.Position" ValueChanged="HandleSliderChange" Min="0" Max="@(ReaderContext.Manager.TextPieces.Count-1)" Step="1" Class="text-neutral-500 text-sm" Color="Color.Tertiary">
         <div class="flex justify-between">
             <div>
                 @((int)(ReaderContext.StateManager.CurrentState.PositionInfo.Position + 1) * 100 / ReaderContext.Manager.TextPieces.Count())%
@@ -133,6 +133,20 @@
         </div>
     </MudSlider>
 </div>
+@if (ReaderContext.Manager.TotalPages > 1)
+{
+    <div class="mb-10 flex justify-center items-center gap-4">
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="PageBefore" Disabled="@(ReaderContext.Manager.CurrentPage <= 1)">
+            <MudIcon Icon="@Icons.Material.Filled.NavigateBefore" Size="Size.Small" />
+        </MudButton>
+        <MudTextField T="int" @bind-Value="@PageInput" OnKeyUp="HandlePageInputKey" Variant="Variant.Outlined" Class="!w-auto !min-w-[3rem] !max-w-[6rem] page-input-field" InputType="InputType.Number" Color="Color.Tertiary" Immediate="true" />
+        <span class="text-neutral-500">/</span>
+        <span class="text-neutral-500">@ReaderContext.Manager.TotalPages</span>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="PageNext" Disabled="@(ReaderContext.Manager.CurrentPage >= ReaderContext.Manager.TotalPages)">
+            <MudIcon Icon="@Icons.Material.Filled.NavigateNext" Size="Size.Small" />
+        </MudButton>
+    </div>
+}
 <MudDialog Options="dialogOptions" @bind-IsVisible="ConfigPanelOpen" Class="rounded-lg shadow-xl !bg-bgcol">
     <DialogContent>
         <div class="m-4 md:m-12" style="width: min(30rem, 90vw);">
@@ -141,10 +155,16 @@
                     Configuration
                 </p>
             </div>
-            <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontReadingSpeed" Min="1" Max="2000" Step="10">Reading Speed: @(ReaderContext.ConfigManager.FrontReadingSpeed)</MudSlider>
+            <div class="my-2 md:my-4">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-lg font-semibold whitespace-nowrap">Reading Speed:</span>
+                    <MudTextField T="int" @bind-Value="@ReaderContext.ConfigManager.FrontReadingSpeed" Min="1" Max="2000" Variant="Variant.Outlined" Class="!w-auto !min-w-[3rem] !max-w-[6rem]" Color="Color.Tertiary" Immediate="true" />
+                </div>
+                <MudSlider Color="Color.Tertiary" @bind-Value="@ReaderContext.ConfigManager.FrontReadingSpeed" Min="1" Max="2000" Step="10" />
+            </div>
             <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontPeripheralCharsCount" Min="0" Max="40" Step="1">Peripheral words character limit: @(ReaderContext.ConfigManager.FrontPeripheralCharsCount)</MudSlider>
             <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontWordNavCount" Min="2" Max="40" Step="1">Word navigation count: @(ReaderContext.ConfigManager.FrontWordNavCount)</MudSlider>
-            <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontTextSize" Min="6" Max="50" Step="1">Text size: @(ReaderContext.ConfigManager.FrontTextSize)</MudSlider>
+            <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontTextSize" Min="6" Max="100" Step="1">Text size: @(ReaderContext.ConfigManager.FrontTextSize)</MudSlider>
             <MudSelect Color="Color.Tertiary" Class="mud-select-table" Label="Font"
                        T="string"
                        @bind-Value="ReaderContext.ConfigManager.FrontFont">
@@ -158,6 +178,8 @@
             <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontPeripheralWordsBrightness" Min="100" Max="900" Step="100">Peripheral words brightness: @(ReaderContext.ConfigManager.FrontPeripheralWordsBrightness)</MudSlider>
             <MudColorPicker Class="my-2 md:my-4" T="string" @bind-Text="@ReaderContext.ConfigManager.FrontMiddleCharHighlightingColor" Label="Middle character highlighting color" ColorPickerView="ColorPickerView.Spectrum" DisableAlpha="true" DisablePreview="true" />
             <MudSwitch Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontRightToLeft" Label="Right to left" />
+            <MudSwitch Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontAutoPauseOnPunctuation" Label="Auto-pause on punctuation" />
+            <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontPunctuationPauseMultiplier" Min="0" Max="1.5" Step="0.05">Punctuation pause: @((int)(ReaderContext.ConfigManager.FrontPunctuationPauseMultiplier * 100))%</MudSlider>
             <p class="my-2 md:my-4">
                 'Character limit per word' may change the reading position. Do not update it while reading.
             </p>
@@ -187,6 +209,8 @@
     bool EditTextPanelOpen = false;
     bool ConfigPanelOpen = false;
     bool FocusModeOn = false;
+    int PageInput = 1;
+    int LastSyncedPage = 0;
 
     private HotKeysContext? _hotKeysContext;
 
@@ -203,6 +227,15 @@
             _hotKeysContext.Add(ModCode.Ctrl|ModCode.Shift, Code.E, ToggleTextPanelOpen);
         }
         ReaderContext.SetStateFields();
+        if (ReaderContext.Manager.TotalPages > 0)
+        {
+            int currentPage = ReaderContext.Manager.CurrentPage;
+            if (currentPage != LastSyncedPage)
+            {
+                PageInput = currentPage;
+                LastSyncedPage = currentPage;
+            }
+        }
     }
 
     private DialogOptions dialogOptions = new() { CloseButton = true, ClassBackground = "blurry" };
@@ -247,6 +280,46 @@
 
     private async Task HandleCopyTitle() {
         await JSRuntime.InvokeVoidAsync("copyTitle");
+    }
+
+    private void PageBefore()
+    {
+        ReaderContext.Manager.JumpToPage(ReaderContext.Manager.CurrentPage - 1);
+        PageInput = ReaderContext.Manager.CurrentPage;
+        StateHasChanged();
+    }
+
+    private void PageNext()
+    {
+        ReaderContext.Manager.JumpToPage(ReaderContext.Manager.CurrentPage + 1);
+        PageInput = ReaderContext.Manager.CurrentPage;
+        StateHasChanged();
+    }
+
+    private void HandleSliderChange(int position)
+    {
+        ReaderContext.StateManager.CurrentState.PositionInfo.Position = position;
+        if (ReaderContext.Manager.TotalPages > 0)
+        {
+            PageInput = ReaderContext.Manager.GetPageForPosition(position);
+            LastSyncedPage = PageInput;
+        }
+        StateHasChanged();
+    }
+
+    private void JumpToInputPage()
+    {
+        ReaderContext.Manager.JumpToPage(PageInput);
+        LastSyncedPage = PageInput;
+        StateHasChanged();
+    }
+
+    private void HandlePageInputKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" || e.Key == "NumpadEnter")
+        {
+            JumpToInputPage();
+        }
     }
 
     public void Dispose()

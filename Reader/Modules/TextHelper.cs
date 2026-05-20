@@ -41,10 +41,13 @@ public static class TextHelper
 
     public static string GetDisplayableReadingTime(int PieceCount, int ReadingSpeed)
     {
-        float hours = (float)PieceCount / ReadingSpeed / 60;
-        int minutes = (int)((hours - (int)hours) * 60);
+        if (ReadingSpeed <= 0) return "0h 0m 0s";
+        float totalMinutes = (float)PieceCount / ReadingSpeed;
+        int hours = (int)(totalMinutes / 60);
+        int minutes = (int)(totalMinutes % 60);
+        int seconds = (int)((totalMinutes - (int)totalMinutes) * 60);
 
-        return $"{(int)hours}h {minutes}m";
+        return $"{hours}h {minutes}m {seconds}s";
     }
 
     public static string JoinWords (IEnumerable<string> words)

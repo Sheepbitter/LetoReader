@@ -21,13 +21,15 @@ public class ReaderState
     public DateTime LastRead;
     public ReaderStateSource Source;
     public string? SourceDescription;
+    public int TotalPages;
 
-    public ReaderState(string title, string text,ReaderStateSource source, string? sourceDescription = null, DateTime? lastRead = null, PositionalMethod positionalMethod = PositionalMethod.Word)
+    public ReaderState(string title, string text,ReaderStateSource source, string? sourceDescription = null, DateTime? lastRead = null, PositionalMethod positionalMethod = PositionalMethod.Word, int pageCount = 0)
     {
         Title = title;
         Source = source;
         SourceDescription = sourceDescription;
         LastRead = lastRead ?? DateTime.Now;
+        TotalPages = pageCount;
 
         PositionInfo = new PositionInfo(positionalMethod, text);
     }
