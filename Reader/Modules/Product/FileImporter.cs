@@ -41,7 +41,9 @@ public class FileImporter
                 }
                 else if (file.Name.EndsWith(".epub"))
                 {
-                    sb.Append(ExtractFromEpub(fileBytes));
+                    var epubResult = ExtractFromEpub(fileBytes);
+                    sb.Append(epubResult.Item1);
+                    pageCount = epubResult.Item2;
                 }
                 else if (file.Name.EndsWith(".md"))
                 {
@@ -115,11 +117,27 @@ public class FileImporter
         return doc.DocumentNode.InnerText;
     }
 
-    public static string ExtractFromEpub(byte[] arr)
+    public static Tuple<string, int> ExtractFromEpub(byte[] arr)
     {
         EpubBook book = EpubReader.Read(arr);
-        return trimWhitespace.Replace(book.ToPlainText(), " ");
+        StringBuilder sb = new();
+        int pageCount = 0;
 
+        foreach (var htmlFile in book.SpecialResources.HtmlInReadingOrder)
+        {
+            string plainText = trimWhitespace.Replace(ExtractStringFromHTMLStr(htmlFile.TextContent), " ").Trim();
+            if (plainText.Length == 0)
+                continue;
+
+            if (pageCount > 0)
+            {
+                sb.Append("\f ");
+            }
+            sb.Append(plainText);
+            pageCount++;
+        }
+
+        return new Tuple<string, int>(sb.ToString(), pageCount);
     }
 
     public static string ExtractStringFromMdStr(string mdStr)

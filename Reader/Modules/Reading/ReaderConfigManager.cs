@@ -112,6 +112,16 @@ public class ReaderConfigManager
         }
     }
 
+    public bool FrontBlockReading
+    {
+        get => Config.BlockReading;
+        set
+        {
+            Config.BlockReading = value;
+            SaveConfig();
+        }
+    }
+
     public string FrontMiddleCharHighlightingColor
     {
         get => Config.MiddleCharHighlightingColor;
@@ -148,6 +158,16 @@ public class ReaderConfigManager
         set
         {
             Config.PunctuationPauseMultiplier = value;
+            SaveConfig();
+        }
+    }
+
+    public bool FrontAutoPauseOnCapitalizedWord
+    {
+        get => Config.AutoPauseOnCapitalizedWord;
+        set
+        {
+            Config.AutoPauseOnCapitalizedWord = value;
             SaveConfig();
         }
     }

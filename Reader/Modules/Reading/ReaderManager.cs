@@ -41,24 +41,8 @@ public class ReaderManager
 
     public void SetupTextPieces()
     {
-        var unvalidatedTextPieces = TextHelper.SeparateText(StateManager.CurrentText);
-
-        List<string> newTextPieces = new();
+        var newTextPieces = WordBlockProcessor.BuildTextPieces(StateManager.CurrentText, Config.WordCharLimit);
         PageStartIndices = new();
-        int currentIndex = 0;
-
-        foreach (var currentTextPiece in unvalidatedTextPieces)
-        {
-            var textPiece = currentTextPiece;
-            while (textPiece.Length > Config.WordCharLimit)
-            {
-                newTextPieces.Add(textPiece[..Math.Min(Config.WordCharLimit, textPiece.Length - 1)]);
-                currentIndex++;
-                textPiece = textPiece.Substring(Config.WordCharLimit);
-            }
-            newTextPieces.Add(textPiece);
-            currentIndex++;
-        }
 
         TextPieces = newTextPieces;
 
@@ -104,26 +88,9 @@ public class ReaderManager
         if (chunkStart == CurrentChunkStart) return;
 
         CurrentChunkStart = chunkStart;
-        int end = Math.Min(TextPieces.Count, chunkStart + ChunkSize);
-        double totalChars = 0;
-        double totalPunctBonus = 0;
-        int count = end - chunkStart;
 
-        for (int i = chunkStart; i < end; i++)
-        {
-            totalChars += TextPieces[i].Length;
-            if (Config.AutoPauseOnPunctuation && TextPieces[i].Length > 0)
-            {
-                char lastChar = TextPieces[i][^1];
-                if (lastChar is '.' or '!' or '?' or ',' or ';' or ':' or '-' or '—')
-                {
-                    totalPunctBonus += Config.PunctuationPauseMultiplier;
-                }
-            }
-        }
-
-        CurrentChunkAvgCharsPerWord = count > 0 ? totalChars / count : 5.0;
-        CurrentChunkAvgPunctuationBonus = count > 0 ? totalPunctBonus / count : 0;
+        (CurrentChunkAvgCharsPerWord, CurrentChunkAvgPunctuationBonus) = WordBlockProcessor.CalculateChunkAverages(
+            TextPieces, position, ChunkSize, Config.AutoPauseOnPunctuation, Config.PunctuationPauseMultiplier);
     }
 
     public async Task HandleStartStop()
@@ -176,22 +143,16 @@ public class ReaderManager
     {
         while (true)
         {
-            if (State.PositionInfo.Position >= TextPieces.Count - 1 || ct.IsCancellationRequested)
+            int pos = (int)State.PositionInfo.Position;
+            if (pos >= TextPieces.Count - 1 || ct.IsCancellationRequested)
             {
                 ReadingStatus = false;
                 await SiteInteraction.HandleSiteStateChanged();
                 break;
             }
 
-            State.PositionInfo.Position++;
-            State.LastRead = DateTime.Now;
-
-            _ = Task.Run(() => StateManager.SaveStates());
-            _ = Task.Run(() => SiteInteraction.HandleSiteStateChanged());
-
             double currentInterval = interval;
 
-            int pos = (int)State.PositionInfo.Position;
             int currentChunk = (pos / ChunkSize) * ChunkSize;
             if (currentChunk != CurrentChunkStart)
             {
@@ -201,35 +162,40 @@ public class ReaderManager
             double avgCharsPerWord = CurrentChunkAvgCharsPerWord;
             double avgPunctuationBonus = CurrentChunkAvgPunctuationBonus;
 
-            double adjustedBaseInterval = interval / (1 + avgPunctuationBonus);
+            int blockSize = WordBlockProcessor.GetBlockAdvanceCount(TextPieces, pos, Config.PeripheralCharsCount, Config.BlockReading, Config.AutoPauseOnPunctuation);
 
-            var lookBehindWords = GetTextPiecesLookBehindInner();
-            var lookAheadWords = GetTextPiecesLookAheadInner();
-            string currentWord = TextPieces[pos];
+            // Time the block exactly as it is rendered: the centre word with its
+            // look-behind and look-ahead. Using the block-start anchor would double-count
+            // it (it is already part of the look-behind) and drop the centre word's length.
+            var displayBlock = GetDisplayBlock();
+            var lookBehindWords = displayBlock.LookBehind;
+            var lookAheadWords = displayBlock.LookAhead;
+            string currentWord = displayBlock.CurrentWord;
 
-            int displayedChars = currentWord.Length
-                + lookBehindWords.Sum(w => w.Length)
-                + lookAheadWords.Sum(w => w.Length);
+            int capitalizedWordCount = Config.AutoPauseOnCapitalizedWord
+                ? WordBlockProcessor.GetCapitalizedWordCount(TextPieces, pos, blockSize)
+                : 0;
 
-            int displayedWordCount = 1 + lookBehindWords.Count + lookAheadWords.Count;
-            double expectedChars = avgCharsPerWord * displayedWordCount;
+            currentInterval = WordBlockProcessor.CalculateInterval(
+                interval,
+                avgCharsPerWord,
+                avgPunctuationBonus,
+                currentWord,
+                lookBehindWords,
+                lookAheadWords,
+                blockSize,
+                Config.AutoPauseOnPunctuation,
+                Config.PunctuationPauseMultiplier,
+                Config.AutoPauseOnCapitalizedWord,
+                capitalizedWordCount);
 
-            if (expectedChars > 0)
-            {
-                adjustedBaseInterval *= (displayedChars / expectedChars);
-            }
+            State.PositionInfo.Position += blockSize;
+            if (State.PositionInfo.Position >= TextPieces.Count - 1)
+                State.PositionInfo.Position = TextPieces.Count - 1;
+            State.LastRead = DateTime.Now;
 
-            currentInterval = adjustedBaseInterval;
-
-            if (Config.AutoPauseOnPunctuation)
-            {
-                char lastChar = currentWord.Length > 0 ? currentWord[^1] : '\0';
-                bool isPunctuation = lastChar is '.' or '!' or '?' or ',' or ';' or ':' or '-' or '—';
-                if (isPunctuation)
-                {
-                    currentInterval += adjustedBaseInterval * Config.PunctuationPauseMultiplier;
-                }
-            }
+            _ = Task.Run(() => StateManager.SaveStates());
+            _ = Task.Run(() => SiteInteraction.HandleSiteStateChanged());
 
             await Task.Delay(TimeSpan.FromSeconds(currentInterval));
         }
@@ -276,11 +242,11 @@ public class ReaderManager
 
     public Tuple<string, string, string> GetCurrentTextPiece()
     {
-        string word = TextPieces[State.PositionInfo.Position];
+        var currentWord = GetDisplayBlock().CurrentWord;
 
-        string front = word.Substring(0, (word.Length + 1) / 2 - 1);
-        string middle = word.Substring((word.Length + 1) / 2 - 1, 1);
-        string back = word.Substring((word.Length + 1) / 2);
+        string front = currentWord.Substring(0, (currentWord.Length + 1) / 2 - 1);
+        string middle = currentWord.Substring((currentWord.Length + 1) / 2 - 1, 1);
+        string back = currentWord.Substring((currentWord.Length + 1) / 2);
 
         return Tuple.Create(front, middle, back);
     }
@@ -298,56 +264,17 @@ public class ReaderManager
 
     public List<string> GetTextPiecesLookAheadInner()
     {
-        if (State.PositionInfo.Position < TextPieces.Count && Config.AutoPauseOnPunctuation)
-        {
-            string currentWord = TextPieces[(int)State.PositionInfo.Position];
-            if (currentWord.Length > 0)
-            {
-                char lastChar = currentWord[^1];
-                if (lastChar is '.' or '!' or '?' or ',' or ';' or ':')
-                {
-                    return new List<string>();
-                }
-            }
-        }
-
-        List<string> result = new();
-        int totalChars = 0;
-        foreach (string word in TextPieces.Skip(State.PositionInfo.Position + 1))
-        {
-            if (totalChars + word.Length <= Config.PeripheralCharsCount)
-            {
-                result.Add(word);
-                totalChars += word.Length + 1;
-            }
-            else
-            {
-                break;
-            }
-        }
-        return result;
+        return GetDisplayBlock().LookAhead;
     }
 
     public List<string> GetTextPiecesLookBehindInner()
     {
-        List<string> result = new();
+        return GetDisplayBlock().LookBehind;
+    }
 
-        if (State.PositionInfo.Position == 0)
-            return result;
-
-        int charCount = 0;
-
-        int i = (int)State.PositionInfo.Position - 1;
-
-        while (i >= 0 && charCount + TextPieces[i].Length <= Config.PeripheralCharsCount)
-        {
-            result.Add(TextPieces[i]);
-            charCount += TextPieces[i].Length + 1;
-            i--;
-        }
-
-        result.Reverse();
-        return result;
+    private WordBlockProcessor.DisplayBlock GetDisplayBlock()
+    {
+        return WordBlockProcessor.GetDisplayBlock(TextPieces, (int)State.PositionInfo.Position, Config.PeripheralCharsCount, Config.BlockReading, Config.AutoPauseOnPunctuation);
     }
 
     public string TextPiecesToStringInOrder(IEnumerable<string> text)

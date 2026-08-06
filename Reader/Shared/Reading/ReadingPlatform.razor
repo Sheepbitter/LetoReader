@@ -120,7 +120,7 @@
                             <h5 class="mt-4 md:mt-6 mb-5 md:mb-8 text-lg font-semibold">
                                 4) Empty fields
                             </h5>
-                            <MudButton Variant="Variant.Filled" OnClick="@ReaderContext.HandleNewText" Color="Color.Secondary" Class="hover:!bg-neutral-900">
+                            <MudButton Variant="Variant.Filled" OnClick="@HandleNewTextPanelCreate" Color="Color.Secondary" Class="hover:!bg-neutral-900">
                                 Create
                             </MudButton>
                         </div>
@@ -254,7 +254,7 @@
         }
         else if (RequestFiles != null)
         {
-            await HandleFileUpload(RequestFiles);
+            await HandleFileUpload(RequestFiles, showConfirmation: false);
         }
         else if (RequestScrapeInputs != null)
         {
@@ -312,7 +312,7 @@
         NewTextPanelOpen = !NewTextPanelOpen;
     }
 
-    private async Task HandleFileUpload(IReadOnlyList<IBrowserFile> files)
+    private async Task HandleFileUpload(IReadOnlyList<IBrowserFile> files, bool showConfirmation = true)
     {
         await Log.Information("ReaderPlatform: HandleFileUpload");
 
@@ -320,6 +320,9 @@
         {
             (ReaderState state, string content) = await FileImporter.ExtractFromBrowserFiles(files);
             await ReaderContext.StateManager.AddState(state, content);
+            NewTextPanelOpen = false;
+            if (showConfirmation)
+                Snackbar.Add("Text added successfully", Severity.Success);
         }
         catch (UnsupportedOperationException e)
         {
@@ -335,6 +338,8 @@
         try
         {
             await ReaderContext.StateManager.AddState(await ReaderState.Scrape(ScrapeInputs));
+            NewTextPanelOpen = false;
+            Snackbar.Add("Text added successfully", Severity.Success);
         }
         catch (ScrapingException e)
         {
@@ -367,6 +372,8 @@
 
             var state = new ReaderState(title, clipboardText, ReaderStateSource.Clipboard, "Created from clipboard's contents");
             await ReaderContext.StateManager.AddState(state, clipboardText);
+            NewTextPanelOpen = false;
+            Snackbar.Add("Text added successfully", Severity.Success);
         }
         catch (Exception e)
         {
@@ -374,6 +381,13 @@
             await Log.Information("ReaderPlatform: HandleFromClipboard - ClipboardException {error}, {stack}", e.Message, e.StackTrace ?? "No trace");
         }
 
+    }
+
+    private async Task HandleNewTextPanelCreate()
+    {
+        await ReaderContext.HandleNewText();
+        NewTextPanelOpen = false;
+        Snackbar.Add("Text added successfully", Severity.Success);
     }
 
     public void Dispose()

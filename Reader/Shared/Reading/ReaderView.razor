@@ -179,6 +179,8 @@
             <MudColorPicker Class="my-2 md:my-4" T="string" @bind-Text="@ReaderContext.ConfigManager.FrontMiddleCharHighlightingColor" Label="Middle character highlighting color" ColorPickerView="ColorPickerView.Spectrum" DisableAlpha="true" DisablePreview="true" />
             <MudSwitch Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontRightToLeft" Label="Right to left" />
             <MudSwitch Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontAutoPauseOnPunctuation" Label="Auto-pause on punctuation" />
+            <MudSwitch Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontAutoPauseOnCapitalizedWord" Label="Auto-pause on capitalized words (names, formal nouns)" />
+            <MudSwitch Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontBlockReading" Label="Read in blocks" />
             <MudSlider Color="Color.Tertiary" Class="my-2 md:my-4" @bind-Value="@ReaderContext.ConfigManager.FrontPunctuationPauseMultiplier" Min="0" Max="1.5" Step="0.05">Punctuation pause: @((int)(ReaderContext.ConfigManager.FrontPunctuationPauseMultiplier * 100))%</MudSlider>
             <p class="my-2 md:my-4">
                 'Character limit per word' may change the reading position. Do not update it while reading.
@@ -221,7 +223,7 @@
             _hotKeysContext = this.HotKeys.CreateContext();
             _hotKeysContext.Add(ModCode.None, Code.Space, (Action)(async () => { await ReaderContext.Manager.HandleStartStop(); await InvokeAsync(() => StateHasChanged()); }));
             _hotKeysContext.Add(ModCode.None, Code.ArrowLeft, (Action)(async () => { ReaderContext.Manager.HandleNavBefore(); await InvokeAsync(() => StateHasChanged()); }));
-            _hotKeysContext.Add(ModCode.None, Code.ArrowRight, ReaderContext.Manager.HandleNavNext);
+            _hotKeysContext.Add(ModCode.None, Code.ArrowRight, (Action)(async () => { ReaderContext.Manager.HandleNavNext(); await InvokeAsync(() => StateHasChanged()); }));
             _hotKeysContext.Add(ModCode.Ctrl, Code.F, (Action)(async () => await ToggleFocusMode()));
             _hotKeysContext.Add(ModCode.Ctrl, Code.S, ToggleConfigPanelOpen);
             _hotKeysContext.Add(ModCode.Ctrl|ModCode.Shift, Code.E, ToggleTextPanelOpen);

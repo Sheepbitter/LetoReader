@@ -15,12 +15,14 @@ public class ReaderConfig
     public int TextSize = 24;
     public int PeripheralCharsCount = 12;
     public int PeripheralWordsBrightness = 500;
+    public bool BlockReading = true;
     public int WordNavCount = 10;
     public int WordCharLimit = 30;
     public string MiddleCharHighlightingColor = "#FFFFFF";
     public bool RightToLeft = false;
     public bool AutoPauseOnPunctuation = true;
     public double PunctuationPauseMultiplier = 0.5;
+    public bool AutoPauseOnCapitalizedWord = false;
 
     public static ReaderConfig GetDefault()
     {
